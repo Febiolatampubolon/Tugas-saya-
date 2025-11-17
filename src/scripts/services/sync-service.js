@@ -190,6 +190,24 @@ class SyncService {
         }
         
         console.log('✅ Offline story synced successfully:', offlineStory.tempId);
+        
+        // Trigger push notification setelah story berhasil di-sync
+        if (window.pushNotificationService && 
+            typeof window.pushNotificationService.simulateNewStoryNotification === 'function') {
+          const notificationData = {
+            ...offlineStory,
+            id: response.story?.id || offlineStory.tempId,
+            name: response.story?.name || offlineStory.name,
+            description: response.story?.description || offlineStory.description,
+          };
+          
+          // Tampilkan notification (tidak perlu await, biarkan berjalan di background)
+          window.pushNotificationService.simulateNewStoryNotification(notificationData)
+            .catch(error => {
+              console.warn('Failed to show notification after sync:', error);
+            });
+        }
+        
         return response;
       } else {
         throw new Error(response.message || 'Failed to sync story');

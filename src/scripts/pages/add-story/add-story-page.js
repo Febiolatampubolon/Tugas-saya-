@@ -227,8 +227,17 @@ class AddStoryPresenter extends BasePresenter {
             this.hideLoading();
             this.showSuccess("Story added successfully!");
 
-            // Trigger push notification simulation - WITH PROPER ERROR HANDLING
-            this.showLocalNotification(storyData);
+            // Trigger push notification melalui service worker
+            // Gabungkan data story dengan response dari API
+            const notificationData = {
+              ...storyData,
+              id: result.story?.id || storyData.id,
+              name: result.story?.name || storyData.name,
+              description: result.story?.description || storyData.description,
+            };
+            
+            // Tampilkan notification (async)
+            await this.showLocalNotification(notificationData);
 
             setTimeout(() => {
               window.location.hash = "#/stories";
@@ -286,9 +295,10 @@ class AddStoryPresenter extends BasePresenter {
   }
 
   // Show local notification with proper error handling
-  showLocalNotification(storyData) {
+  // Sekarang async karena menggunakan service worker
+  async showLocalNotification(storyData) {
     try {
-      console.log("📢 Attempting to show local notification...");
+      console.log("📢 Attempting to show local notification...", storyData);
 
       // Check if push notification service is available and has the method
       if (window.pushNotificationService) {
@@ -297,7 +307,8 @@ class AddStoryPresenter extends BasePresenter {
           typeof window.pushNotificationService.simulateNewStoryNotification ===
           "function"
         ) {
-          window.pushNotificationService.simulateNewStoryNotification(
+          // Method sekarang async, jadi perlu await
+          await window.pushNotificationService.simulateNewStoryNotification(
             storyData
           );
           return;
@@ -307,9 +318,9 @@ class AddStoryPresenter extends BasePresenter {
           typeof window.pushNotificationService.showLocalNotification ===
           "function"
         ) {
-          window.pushNotificationService.showLocalNotification(
-            "New Story Added",
-            storyData.description,
+          await window.pushNotificationService.showLocalNotification(
+            "Cerita Baru Ditambahkan",
+            storyData.description || "Sebuah cerita baru telah ditambahkan",
             { id: storyData.id || Date.now().toString() }
           );
           return;
@@ -318,8 +329,10 @@ class AddStoryPresenter extends BasePresenter {
 
       // Fallback: Direct browser notification
       if ("Notification" in window && Notification.permission === "granted") {
-        const notification = new Notification("📖 New Story Added", {
-          body: storyData.description.substring(0, 100) + "...",
+        const notification = new Notification("📖 Cerita Baru Ditambahkan", {
+          body: storyData.description
+            ? storyData.description.substring(0, 100) + "..."
+            : "Sebuah cerita baru telah ditambahkan",
           icon: "/images/story.png",
           tag: "new-story",
         });
@@ -330,7 +343,7 @@ class AddStoryPresenter extends BasePresenter {
           notification.close();
         };
 
-        console.log("✅ Local notification shown successfully");
+        console.log("✅ Local notification shown successfully (fallback)");
       } else {
         console.log("ℹ️ Notification not available or permission not granted");
       }

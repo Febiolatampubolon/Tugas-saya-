@@ -245,6 +245,37 @@ self.addEventListener("notificationclick", (event) => {
   );
 });
 
+// Message event - handle messages from main thread
+self.addEventListener("message", (event) => {
+  console.log("Service Worker: Message received", event.data);
+
+  if (event.data && event.data.type === "SHOW_NOTIFICATION") {
+    const { title, options } = event.data;
+    
+    event.waitUntil(
+      self.registration.showNotification(title || "New Notification", {
+        body: options?.body || "New data has been added.",
+        icon: options?.icon || "/images/story.png",
+        badge: options?.badge || "/images/story.png",
+        data: options?.data || {},
+        tag: options?.tag || "story-notification",
+        vibrate: [200, 100, 200],
+        requireInteraction: true,
+        actions: [
+          {
+            action: "view",
+            title: "View",
+          },
+          {
+            action: "close",
+            title: "Close",
+          },
+        ],
+      })
+    );
+  }
+});
+
 // Background sync for offline data
 self.addEventListener("sync", (event) => {
   console.log("Service Worker: Background sync event", event.tag);

@@ -399,37 +399,47 @@ class PushNotificationService {
   }
 
   // Simulate receiving a push notification when a new story is added
-  simulateNewStoryNotification(storyData) {
+  // Menggunakan service worker untuk menampilkan notification
+  async simulateNewStoryNotification(storyData) {
     console.log("📢 Simulating new story notification:", storyData);
 
-    // Check if notifications are supported and permission is granted
-    if (!("Notification" in window)) {
-      console.warn("❌ Notification API not supported");
-      return false;
-    }
-
-    if (Notification.permission !== "granted") {
-      console.warn("❌ Notification permission not granted");
-      return false;
-    }
-
     try {
-      // Create notification
-      const notification = new Notification("📖 New Story Added!", {
-        body:
-          `"${
-            storyData.name || "Untitled Story"
-          }" - ${storyData.description?.substring(0, 100)}...` ||
-          "A new story has been added",
+      // Pastikan service worker registration tersedia
+      if (!this.registration) {
+        console.log("⏳ Service worker registration not ready, waiting...");
+        this.registration = await navigator.serviceWorker.ready;
+      }
+
+      if (!this.registration) {
+        console.warn("❌ Service worker registration not available");
+        // Fallback ke browser notification
+        return this.showFallbackNotification(storyData);
+      }
+
+      // Cek permission
+      if (Notification.permission !== "granted") {
+        console.warn("❌ Notification permission not granted");
+        return false;
+      }
+
+      // Siapkan data notification
+      const notificationTitle = "📖 Cerita Baru Ditambahkan!";
+      const notificationBody = storyData.description
+        ? `"${storyData.name || "Cerita Baru"}" - ${storyData.description.substring(0, 100)}${storyData.description.length > 100 ? "..." : ""}`
+        : "Sebuah cerita baru telah ditambahkan";
+
+      // Tampilkan notification melalui service worker
+      await this.registration.showNotification(notificationTitle, {
+        body: notificationBody,
         icon: "/images/story.png",
-        image: storyData.photoUrl, // Jika ada URL foto
-        badge: "/images/icon-192x512x512.png",
+        badge: "/images/icon-192x192.svg",
         tag: "new-story",
-        requireInteraction: true,
         data: {
-          storyId: storyData.id,
+          storyId: storyData.id || storyData.tempId,
           url: "/#/stories",
         },
+        vibrate: [200, 100, 200],
+        requireInteraction: true,
         actions: [
           {
             action: "view",
@@ -442,23 +452,45 @@ class PushNotificationService {
         ],
       });
 
-      // Handle notification click
+      console.log("✅ Notification shown through service worker");
+      return true;
+    } catch (error) {
+      console.error("❌ Failed to show notification through service worker:", error);
+      // Fallback ke browser notification
+      return this.showFallbackNotification(storyData);
+    }
+  }
+
+  // Fallback notification jika service worker tidak tersedia
+  showFallbackNotification(storyData) {
+    if (!("Notification" in window)) {
+      console.warn("❌ Notification API not supported");
+      return false;
+    }
+
+    if (Notification.permission !== "granted") {
+      console.warn("❌ Notification permission not granted");
+      return false;
+    }
+
+    try {
+      const notification = new Notification("📖 Cerita Baru Ditambahkan!", {
+        body: storyData.description
+          ? `"${storyData.name || "Cerita Baru"}" - ${storyData.description.substring(0, 100)}...`
+          : "Sebuah cerita baru telah ditambahkan",
+        icon: "/images/story.png",
+        tag: "new-story",
+      });
+
       notification.onclick = () => {
-        console.log("Notification clicked, story ID:", storyData.id);
         window.focus();
-        window.location.hash = `#/stories/${storyData.id}`;
+        window.location.hash = "#/stories";
         notification.close();
       };
 
-      // Handle notification close
-      notification.onclose = () => {
-        console.log("Notification closed");
-      };
-
-      console.log("✅ Local notification shown successfully");
       return true;
     } catch (error) {
-      console.error("❌ Failed to show local notification:", error);
+      console.error("❌ Failed to show fallback notification:", error);
       return false;
     }
   }
